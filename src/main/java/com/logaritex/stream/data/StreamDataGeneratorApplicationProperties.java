@@ -37,16 +37,6 @@ public class StreamDataGeneratorApplicationProperties {
 	private int scheduledThreadPoolSize = 10;
 
 	/**
-	 * Kafka Broker URL
-	 */
-	private String kafkaServer = "localhost:9094";
-
-	/**
-	 * Optional Kafka Confluence schema registry. Required if the AVRO_SCHEMA_REGISTRY format is used.
-	 */
-	private String schemaRegistryServer = "http://localhost:8081";
-
-	/**
 	 * Terminate the generator after given duration of time. Defaults to 1 billion years, e.g. run forever.
 	 */
 	private Duration terminateAfter = Duration.ofDays(1000000 * 356); // 1B years
@@ -62,22 +52,6 @@ public class StreamDataGeneratorApplicationProperties {
 
 	public void setScheduledThreadPoolSize(int scheduledThreadPoolSize) {
 		this.scheduledThreadPoolSize = scheduledThreadPoolSize;
-	}
-
-	public String getKafkaServer() {
-		return kafkaServer;
-	}
-
-	public void setKafkaServer(String kafkaServer) {
-		this.kafkaServer = kafkaServer;
-	}
-
-	public String getSchemaRegistryServer() {
-		return schemaRegistryServer;
-	}
-
-	public void setSchemaRegistryServer(String schemaRegistryServer) {
-		this.schemaRegistryServer = schemaRegistryServer;
 	}
 
 	public Duration getTerminateAfter() {
@@ -101,10 +75,6 @@ public class StreamDataGeneratorApplicationProperties {
 	 */
 	public Map<String, Object> getCommonKafkaProperties() {
 		Map<String, Object> commonKafkaProperties = new HashMap<>();
-		commonKafkaProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, this.getKafkaServer());
-		if (StringUtils.hasText(this.getSchemaRegistryServer())) {
-			commonKafkaProperties.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, this.getSchemaRegistryServer());
-		}
 		commonKafkaProperties.put(ProducerConfig.RETRIES_CONFIG, 0);
 		commonKafkaProperties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
 		commonKafkaProperties.put(ProducerConfig.LINGER_MS_CONFIG, 1);

@@ -12,18 +12,21 @@ import org.apache.avro.generic.GenericData;
 public class RecordSenderThread implements Runnable {
 
 	private final MessageSender messageSender;
-	private final DataGenerator avroRandomData;
+	private final DataGenerator dataGenerator;
 	private final StreamDataGeneratorApplicationProperties.RecordStream topicProperties;
 	private final AtomicBoolean exitFlag;
+	private String streamName;
 
 	public RecordSenderThread(
+			String streamName,
 			MessageSender messageSender,
-			DataGenerator dataFaker,
+			DataGenerator dataGenerator,
 			StreamDataGeneratorApplicationProperties.RecordStream topicProperties,
 			AtomicBoolean exitFlag) {
 
+		this.streamName = streamName;
 		this.messageSender = messageSender;
-		this.avroRandomData = dataFaker;
+		this.dataGenerator = dataGenerator;
 		this.topicProperties = topicProperties;
 		this.exitFlag = exitFlag;
 	}
@@ -33,19 +36,18 @@ public class RecordSenderThread implements Runnable {
 
 		final AtomicLong messageKey = new AtomicLong(System.currentTimeMillis());
 
-		Iterator<GenericData.Record> iterator = avroRandomData.iterator();
+		Iterator<GenericData.Record> iterator = dataGenerator.iterator();
 		if (!this.topicProperties.isSkipSending()) {
 			while (!this.exitFlag.get() && iterator.hasNext()) {
 				GenericData.Record record = iterator.next();
 				if (record != null) {
 					Object messageValue = toValueFormat(record);
-					this.messageSender.send(messageKey.incrementAndGet(), messageValue);
+					this.messageSender.send(this.streamName, messageKey.incrementAndGet(), messageValue);
 				}
 				try {
 					Thread.sleep(this.topicProperties.getBatch().getMessageDelay().toMillis());
-				}
-				catch (InterruptedException e) {
-					//e.printStackTrace();
+				} catch (InterruptedException e) {
+					// e.printStackTrace();
 				}
 			}
 		}
@@ -53,12 +55,12 @@ public class RecordSenderThread implements Runnable {
 
 	private Object toValueFormat(GenericData.Record record) {
 		switch (this.topicProperties.getValueFormat()) {
-		case JSON:
-			return DataUtil.toJsonObjectNode(record);
-		case YAML:
-			return DataUtil.toYaml(record);
-		default:
-			return record;
+			case JSON:
+				return DataUtil.toJsonObjectNode(record);
+			case YAML:
+				return DataUtil.toYaml(record);
+			default:
+				return record;
 		}
 	}
 }

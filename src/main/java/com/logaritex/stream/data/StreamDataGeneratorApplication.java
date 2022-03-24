@@ -16,7 +16,6 @@
 
 package com.logaritex.stream.data;
 
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -30,10 +29,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.logaritex.data.generator.DataGenerator;
 import com.logaritex.data.generator.DataUtil;
 import com.logaritex.data.generator.context.SharedFieldValuesContext;
-import com.logaritex.stream.data.protocol.KafkaMessageSender;
-
 import org.apache.avro.Schema;
-import org.apache.kafka.common.serialization.LongSerializer;
+//import org.apache.kafka.common.serialization.LongSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +50,11 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 	private final StreamDataGeneratorApplicationProperties properties;
 
-	public StreamDataGeneratorApplication(@Autowired StreamDataGeneratorApplicationProperties appProperties) {
+	private MessageSender messageSender;
+
+	public StreamDataGeneratorApplication(@Autowired BinderMessageSender messageSender,
+			@Autowired StreamDataGeneratorApplicationProperties appProperties) {
+		this.messageSender = messageSender;
 		this.properties = appProperties;
 	}
 
@@ -68,8 +69,8 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 		try (SharedFieldValuesContext sharedFieldsContext = new SharedFieldValuesContext(new Random(randomSeed))) {
 
-			ScheduledExecutorService scheduler =
-					Executors.newScheduledThreadPool(this.properties.getScheduledThreadPoolSize());
+			ScheduledExecutorService scheduler = Executors
+					.newScheduledThreadPool(this.properties.getScheduledThreadPoolSize());
 
 			AtomicBoolean exitFlag = new AtomicBoolean(false);
 
@@ -82,21 +83,21 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 					entries.put("avro-schema-uri", topicProperties.getAvroSchemaUri());
 				});
 
-				Schema avroSchema = StringUtils.hasText(topicProperties.getAvroSchema()) ?
-						DataUtil.contentToSchema(topicProperties.getAvroSchema()) :
-						DataUtil.resourceToSchema(topicProperties.getAvroSchemaUri());
+				Schema avroSchema = StringUtils.hasText(topicProperties.getAvroSchema())
+						? DataUtil.contentToSchema(topicProperties.getAvroSchema())
+						: DataUtil.resourceToSchema(topicProperties.getAvroSchemaUri());
 
-				DataGenerator dataGenerator =
-						new DataGenerator(avroSchema, topicProperties.getBatch().getSize(),
-								!DataGenerator.UTF_8_FOR_STRING, sharedFieldsContext, randomSeed);
+				DataGenerator dataGenerator = new DataGenerator(avroSchema, topicProperties.getBatch().getSize(),
+						!DataGenerator.UTF_8_FOR_STRING, sharedFieldsContext, randomSeed);
 
 				// TODO parametrize the key serializer.
-				MessageSender messageSender = new KafkaMessageSender(
-						this.properties.getKafkaServer(), this.properties.getSchemaRegistryServer(),
-						topicProperties.getValueFormat(), topicProperties.getStreamName(), LongSerializer.class);
+				// MessageSender messageSender = new KafkaMessageSender(
+				// this.properties.getKafkaServer(), this.properties.getSchemaRegistryServer(),
+				// topicProperties.getValueFormat(), topicProperties.getStreamName(),
+				// LongSerializer.class);
 
 				RecordSenderThread recordSenderThread = new RecordSenderThread(
-						messageSender, dataGenerator, topicProperties, exitFlag);
+						topicProperties.getStreamName(), this.messageSender, dataGenerator, topicProperties, exitFlag);
 
 				ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
 						recordSenderThread,
@@ -109,8 +110,7 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 			try {
 				Thread.sleep(this.properties.getTerminateAfter().toMillis());
-			}
-			catch (InterruptedException e) {
+			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 
@@ -126,8 +126,7 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 			if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
 				threadPool.shutdownNow();
 			}
-		}
-		catch (InterruptedException ex) {
+		} catch (InterruptedException ex) {
 			threadPool.shutdownNow();
 			Thread.currentThread().interrupt();
 		}
