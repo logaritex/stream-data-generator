@@ -19,7 +19,6 @@ package com.logaritex.stream.data;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -29,11 +28,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.logaritex.data.generator.DataGenerator;
 import com.logaritex.data.generator.DataUtil;
 import com.logaritex.data.generator.context.SharedFieldValuesContext;
+
 import org.apache.avro.Schema;
-//import org.apache.kafka.common.serialization.LongSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -52,10 +50,13 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 	private MessageSender messageSender;
 
+	private ScheduledExecutorService schedulerExecutorService;
+
 	public StreamDataGeneratorApplication(@Autowired BinderMessageSender messageSender,
 			@Autowired StreamDataGeneratorApplicationProperties appProperties) {
 		this.messageSender = messageSender;
 		this.properties = appProperties;
+		this.schedulerExecutorService = Executors.newScheduledThreadPool(appProperties.getScheduledThreadPoolSize());
 	}
 
 	public static void main(String[] args) {
@@ -69,15 +70,13 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 		try (SharedFieldValuesContext sharedFieldsContext = new SharedFieldValuesContext(new Random(randomSeed))) {
 
-			ScheduledExecutorService scheduler = Executors
-					.newScheduledThreadPool(this.properties.getScheduledThreadPoolSize());
-
 			AtomicBoolean exitFlag = new AtomicBoolean(false);
 
 			List<ScheduledFuture> scheduledFutures = new ArrayList<>();
 
 			for (StreamDataGeneratorApplicationProperties.RecordStream topicProperties : this.properties.getStreams()) {
 
+				// Properties mutually exclusion constrain check.
 				MutuallyExclusiveConfigurationPropertiesException.throwIfMultipleNonNullValuesIn((entries) -> {
 					entries.put("avro-schema", topicProperties.getAvroSchema());
 					entries.put("avro-schema-uri", topicProperties.getAvroSchemaUri());
@@ -91,15 +90,10 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 						!DataGenerator.UTF_8_FOR_STRING, sharedFieldsContext, randomSeed);
 
 				// TODO parametrize the key serializer.
-				// MessageSender messageSender = new KafkaMessageSender(
-				// this.properties.getKafkaServer(), this.properties.getSchemaRegistryServer(),
-				// topicProperties.getValueFormat(), topicProperties.getStreamName(),
-				// LongSerializer.class);
-
 				RecordSenderThread recordSenderThread = new RecordSenderThread(
 						topicProperties.getStreamName(), this.messageSender, dataGenerator, topicProperties, exitFlag);
 
-				ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
+				ScheduledFuture<?> future = this.schedulerExecutorService.scheduleWithFixedDelay(
 						recordSenderThread,
 						topicProperties.getBatch().getInitialDelay().toMillis(),
 						topicProperties.getBatch().getDelay().toMillis(),
@@ -116,18 +110,18 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 			exitFlag.set(true);
 			scheduledFutures.forEach(future -> future.cancel(true));
-			awaitTerminationAfterShutdown(scheduler);
+			awaitTerminationAfterShutdown();
 		}
 	}
 
-	private void awaitTerminationAfterShutdown(ExecutorService threadPool) {
-		threadPool.shutdown();
+	private void awaitTerminationAfterShutdown() {
+		this.schedulerExecutorService.shutdown();
 		try {
-			if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
-				threadPool.shutdownNow();
+			if (!this.schedulerExecutorService.awaitTermination(60, TimeUnit.SECONDS)) {
+				this.schedulerExecutorService.shutdownNow();
 			}
 		} catch (InterruptedException ex) {
-			threadPool.shutdownNow();
+			this.schedulerExecutorService.shutdownNow();
 			Thread.currentThread().interrupt();
 		}
 	}

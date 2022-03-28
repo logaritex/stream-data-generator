@@ -18,21 +18,15 @@ package com.logaritex.stream.data;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
-import org.springframework.util.StringUtils;
 
 @ConfigurationProperties("stream.data.generator")
 public class StreamDataGeneratorApplicationProperties {
 
-	public enum ValueFormat {AVRO, AVRO_SCHEMA_REGISTRY, JSON, YAML}
+	public enum ValueFormat {AVRO, JSON, YAML}
 
 	private int scheduledThreadPoolSize = 10;
 
@@ -64,22 +58,6 @@ public class StreamDataGeneratorApplicationProperties {
 
 	public List<RecordStream> getStreams() {
 		return streams;
-	}
-
-	/**
-	 * TODO to let users provide their own, custom, Kafka properties!
-	 *
-	 * Common Kafka connection properties.
-	 *
-	 * @return Returns an opinionated Kafka connection configuration based on the existing properties.
-	 */
-	public Map<String, Object> getCommonKafkaProperties() {
-		Map<String, Object> commonKafkaProperties = new HashMap<>();
-		commonKafkaProperties.put(ProducerConfig.RETRIES_CONFIG, 0);
-		commonKafkaProperties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
-		commonKafkaProperties.put(ProducerConfig.LINGER_MS_CONFIG, 1);
-		commonKafkaProperties.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
-		return commonKafkaProperties;
 	}
 
 	public static class RecordStream {

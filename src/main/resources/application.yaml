@@ -4,6 +4,27 @@ stream:
       terminateAfter: 300s
 
       streams:
+        # - streamName: rabbit-stream-songs
+        #   valueFormat: AVRO
+        #   avroSchema: |-
+        #     {
+        #      "namespace": "com.tanzu.streaming.runtime.playsongs.avro",
+        #      "type": "record",
+        #      "name": "Song",
+        #      "doc": "unique_on=song_id",
+        #      "fields": [
+        #          {"name": "song_id", "type": "long",   "doc" : "#{number.number_between '1','1000'}"},
+        #          {"name": "album",   "type": "string", "doc" : "#{ancient.hero} #{ancient.god}"},
+        #          {"name": "artist",  "type": "string", "doc" : "#{artist.names}"},
+        #          {"name": "name",    "type": "string", "doc" : "#{rock_band.name}"},
+        #          {"name": "genre",   "type": "string", "doc" : "#{music.genres}"}
+        #      ]
+        #     }                      
+        #   batch:
+        #     size: 100
+        #     initialDelay: 1ms
+        #     messageDelay: 10ms      
+
         - streamName: kafka-stream-songs
           valueFormat: AVRO
           avroSchema: |-
@@ -51,6 +72,8 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: "10s"
 
+# Destination Bindings. 
+# stream.data.generator.streams.streamName == spring.cloud.stream.bindings.<name>
   cloud:  
     stream:           
       default-binder: kafka
@@ -69,11 +92,15 @@ spring:
           producer:
             useNativeEncoding: true
 
-        producer-out-1:
+        rabbit-stream-songs:
           binder: rabbit1
-          destination: first-exchange
+          destination: rabbit-stream-songs
+          contentType: application/*+avro
+          # contentType: application/json    
 
+      # Binders configurations
       binders:
+        # Kafka Binder doc: https://docs.spring.io/spring-cloud-stream-binder-kafka/docs/3.2.2/reference/html/spring-cloud-stream-binder-kafka.html#_apache_kafka_binder
         kafka1:
           type: kafka
           environment:
@@ -87,7 +114,8 @@ spring:
                         schema.registry.url: 'http://localhost:8081'
                         value.serializer: 'io.confluent.kafka.streams.serdes.avro.GenericAvroSerializer'
                         # value.serializer: 'io.confluent.kafka.serializers.KafkaAvroSerializer'
-
+                        
+        # RabbitMQ Binder doc: https://docs.spring.io/spring-cloud-stream-binder-rabbit/docs/3.2.2/reference/html/spring-cloud-stream-binder-rabbit.html
         rabbit1:
           type: rabbit
           environment:
@@ -95,3 +123,5 @@ spring:
               rabbitmq:
                 host: 'localhost'
                 port: '5672'
+
+        # Additional binder impl: https://docs.spring.io/spring-cloud-stream/docs/3.2.2/reference/html/binders.html#binders
