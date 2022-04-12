@@ -1,5 +1,8 @@
 package com.logaritex.stream.data;
 
 public interface MessageSender {
-	void send(String streamName, Object key, Object value);
+
+	MessageSenderType type();
+
+	void send(String destination, Object key, Object value);
 }

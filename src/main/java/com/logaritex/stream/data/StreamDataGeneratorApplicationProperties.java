@@ -59,12 +59,32 @@ public class StreamDataGeneratorApplicationProperties {
 	public List<RecordStream> getStreams() {
 		return streams;
 	}
+	
+	public static class Destination {
+		private MessageSenderType type = MessageSenderType.STREAM;
+		private String name;
+
+		public MessageSenderType getType() {
+			return type;
+		}
+		public void setType(MessageSenderType type) {
+			this.type = type;
+		}
+		public String getName() {
+			return name;
+		}
+		public void setName(String name) {
+			this.name = name;
+		}		
+	}
 
 	public static class RecordStream {
 		/**
 		 * Kafka topic name.
 		 */
 		private String streamName;
+
+		private Destination destination = new Destination();
 
 		/**
 		 * Annotated Avro schema used by the DataFaker for data generation.
@@ -137,6 +157,10 @@ public class StreamDataGeneratorApplicationProperties {
 			this.skipSending = skipSending;
 		}
 
+		public Destination getDestination() {
+			return destination;
+		}
+	
 		@Override
 		public String toString() {
 			return "Stream{" +

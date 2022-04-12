@@ -19,8 +19,8 @@ import org.springframework.util.MimeType;
 public class StreamDataGeneratorConfiguration {
 
     @Bean
-	public BinderMessageSender messageSender(StreamBridge streamBridge) {
-		return new BinderMessageSender(streamBridge);
+	public StreamMessageSender messageSender(StreamBridge streamBridge) {
+		return new StreamMessageSender(streamBridge);
 	}
 
     @Bean

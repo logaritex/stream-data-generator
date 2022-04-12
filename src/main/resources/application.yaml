@@ -1,10 +1,13 @@
 stream:
   data:
     generator:
-      terminateAfter: 300s
+      terminateAfter: 60s
 
       streams:
         # - streamName: rabbit-stream-songs
+        #   destination:
+        #     type: STREAM
+        #     name: rabbit-stream-songs
         #   valueFormat: AVRO
         #   avroSchema: |-
         #     {
@@ -21,11 +24,16 @@ stream:
         #      ]
         #     }                      
         #   batch:
-        #     size: 100
+        #     size: 1
+        #     # size: 100
         #     initialDelay: 1ms
         #     messageDelay: 10ms      
+        #     delay: 15s
 
-        - streamName: kafka-stream-songs
+        - streamName: stream-songs
+          destination:
+            type: STREAM
+            name: kafka-stream-songs
           valueFormat: AVRO
           avroSchema: |-
             {
@@ -47,7 +55,10 @@ stream:
             messageDelay: 10ms
             # The batch delay is not set defaulting to never rescheduling record batches for this topic. E.g. run once and stop.
 
-        - streamName: kafka-stream-playevents
+        - streamName: stream-playevents
+          destination:
+            type: STREAM
+            name: kafka-stream-playevents
           valueFormat: AVRO
           avroSchema: |-
             {

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorization-attempts-data-generator
+  labels:
+    app: authorization-attempts-data-generator
+    component: authorization-attempts-data-generator
+    type: streaming-spike
+    spring-deployment-id: authorization-attempts-data-generator
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      name: authorization-attempts-data-generator
+      targetPort: 8080
+      protocol: TCP
+
+  selector:
+    app: authorization-attempts-data-generator
+    component: authorization-attempts-data-generator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorization-attempts-data-generator
+  labels:
+    app: authorization-attempts-data-generator
+    type: streaming-spike
+    component: authorization-attempts-data-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authorization-attempts-data-generator
+  template:
+    metadata:
+      labels:
+        app: authorization-attempts-data-generator
+        component: authorization-attempts-data-generator
+    spec:
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: authorization-attempts-data-generator
+          image: ghcr.io/logaritex/stream-data-generator:latest
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          ports:
+            - containerPort: 8080
+      volumes:
+      - configMap:
+          items:
+          - key: application.yaml
+            path: application.yaml
+          name: data-generator-configmap
+        name: config

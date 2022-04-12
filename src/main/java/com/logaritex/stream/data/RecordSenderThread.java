@@ -3,32 +3,37 @@ package com.logaritex.stream.data;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.logaritex.data.generator.DataGenerator;
 import com.logaritex.data.generator.DataUtil;
 
 import org.apache.avro.generic.GenericData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RecordSenderThread implements Runnable {
+
+	protected static final Logger logger = LoggerFactory.getLogger(RecordSenderThread.class);
 
 	private final MessageSender messageSender;
 	private final DataGenerator dataGenerator;
 	private final StreamDataGeneratorApplicationProperties.RecordStream topicProperties;
 	private final AtomicBoolean exitFlag;
-	private String streamName;
+	private String destinationName;
 
-	public RecordSenderThread(
-			String streamName,
-			MessageSender messageSender,
-			DataGenerator dataGenerator,
-			StreamDataGeneratorApplicationProperties.RecordStream topicProperties,
-			AtomicBoolean exitFlag) {
+	private ReentrantLock lock;
 
-		this.streamName = streamName;
+	public RecordSenderThread(String destinationName, MessageSender messageSender, DataGenerator dataGenerator,
+			StreamDataGeneratorApplicationProperties.RecordStream topicProperties, AtomicBoolean exitFlag,
+			ReentrantLock lock) {
+
+		this.destinationName = destinationName;
 		this.messageSender = messageSender;
 		this.dataGenerator = dataGenerator;
 		this.topicProperties = topicProperties;
 		this.exitFlag = exitFlag;
+		this.lock = lock;
 	}
 
 	@Override
@@ -42,7 +47,12 @@ public class RecordSenderThread implements Runnable {
 				GenericData.Record record = iterator.next();
 				if (record != null) {
 					Object messageValue = toValueFormat(record);
-					this.messageSender.send(this.streamName, messageKey.incrementAndGet(), messageValue);
+					try {
+						lock.lock();
+						this.messageSender.send(this.destinationName, messageKey.incrementAndGet(), messageValue);
+					} finally {
+						lock.unlock();
+					}
 				}
 				try {
 					Thread.sleep(this.topicProperties.getBatch().getMessageDelay().toMillis());

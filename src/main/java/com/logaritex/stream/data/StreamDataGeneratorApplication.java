@@ -17,13 +17,17 @@
 package com.logaritex.stream.data;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.logaritex.data.generator.DataGenerator;
 import com.logaritex.data.generator.DataUtil;
@@ -38,6 +42,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.source.MutuallyExclusiveConfigurationPropertiesException;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.util.StringUtils;
 
 @SpringBootApplication
@@ -48,15 +53,36 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 
 	private final StreamDataGeneratorApplicationProperties properties;
 
-	private MessageSender messageSender;
-
 	private ScheduledExecutorService schedulerExecutorService;
 
-	public StreamDataGeneratorApplication(@Autowired BinderMessageSender messageSender,
-			@Autowired StreamDataGeneratorApplicationProperties appProperties) {
-		this.messageSender = messageSender;
+	private ReentrantLock lock = new ReentrantLock();
+
+	private ConfigurableApplicationContext applicationContext;
+
+	private Map<MessageSenderType, MessageSender> messageSenders;
+
+	public StreamDataGeneratorApplication(@Autowired MessageSender[] messageSenders,
+			@Autowired StreamDataGeneratorApplicationProperties appProperties,
+			@Autowired ConfigurableApplicationContext appContext) {
+
+		this.messageSenders = new HashMap<>();
+		for (MessageSender ms : messageSenders) {
+			this.messageSenders.put(ms.type(), ms);
+
+		}
+
 		this.properties = appProperties;
-		this.schedulerExecutorService = Executors.newScheduledThreadPool(appProperties.getScheduledThreadPoolSize());
+		this.applicationContext = appContext;
+		this.schedulerExecutorService = Executors.newScheduledThreadPool(
+				appProperties.getScheduledThreadPoolSize(),
+				new ThreadFactory() {
+					@Override
+					public Thread newThread(Runnable runnable) {
+						Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+						thread.setDaemon(true);
+						return thread;
+					}
+				});
 	}
 
 	public static void main(String[] args) {
@@ -90,8 +116,10 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 						!DataGenerator.UTF_8_FOR_STRING, sharedFieldsContext, randomSeed);
 
 				// TODO parametrize the key serializer.
+
+				MessageSender messageSender = this.messageSenders.get(topicProperties.getDestination().getType());
 				RecordSenderThread recordSenderThread = new RecordSenderThread(
-						topicProperties.getStreamName(), this.messageSender, dataGenerator, topicProperties, exitFlag);
+					topicProperties.getDestination().getName(), messageSender, dataGenerator, topicProperties, exitFlag, lock);
 
 				ScheduledFuture<?> future = this.schedulerExecutorService.scheduleWithFixedDelay(
 						recordSenderThread,
@@ -124,5 +152,6 @@ public class StreamDataGeneratorApplication implements CommandLineRunner {
 			this.schedulerExecutorService.shutdownNow();
 			Thread.currentThread().interrupt();
 		}
+		this.applicationContext.close();
 	}
 }
